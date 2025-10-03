@@ -6,29 +6,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CV ZO Edition</title>
     
-    <!-- Google tag (gtag.js) -->
+    <!-- Google tag (gtag.js) - GDPR Compliant -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-N1XJNCSMPG"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
 
+      // GDPR Compliant Configuration
       gtag('config', 'G-N1XJNCSMPG', {
-        // Enhanced measurement settings
-        send_page_view: true,
-        // Debug mode for development
-        debug_mode: window.location.hostname === 'localhost'
-      });
-      
-      // Fallback for blocked requests
-      window.addEventListener('error', function(e) {
-        if (e.message.includes('google-analytics') || e.message.includes('gtag')) {
-          console.warn('🚫 Google Analytics blocked by ad blocker or browser security');
+        // Privacy compliant settings
+        anonymize_ip: true,
+        allow_google_signals: false,
+        allow_ad_personalization_signals: false,
+        // Only enable debug in development
+        debug_mode: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1',
+        // Cookie settings
+        cookie_flags: 'SameSite=None;Secure',
+        // Data retention
+        custom_map: {
+          'custom_parameter_1': 'user_type'
         }
       });
+      
+      // Consent management
+      gtag('consent', 'default', {
+        'analytics_storage': 'denied',
+        'ad_storage': 'denied',
+        'ad_user_data': 'denied',
+        'ad_personalization': 'denied'
+      });
+    
+    
     </script>
   </head>
   <body>
+    <!-- Cookie Consent Banner -->
+    <div id="cookie-consent-banner" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0, 0, 0, 0.9); color: white; padding: 1rem; z-index: 10000; text-align: center;">
+      <p style="margin: 0 0 1rem 0;">
+        This website uses Google Analytics to analyze site usage. 
+        <a href="/privacy-policy" style="color: #667eea; text-decoration: underline;">Privacy Policy</a>
+      </p>
+      <button id="accept-cookies" style="background: #667eea; color: white; border: none; padding: 0.5rem 1rem; margin-right: 1rem; border-radius: 4px; cursor: pointer;">Accept</button>
+      <button id="decline-cookies" style="background: transparent; color: white; border: 1px solid white; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">Decline</button>
+    </div>
+    
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

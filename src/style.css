@@ -5,6 +5,20 @@
   box-sizing: border-box;
 }
 
+/* Performance optimizations */
+.flashlight-triangle,
+.flashlight-circle,
+.cv-icon {
+  will-change: transform;
+}
+
+/* GPU acceleration for animations */
+.flashlight-triangle,
+.flashlight-circle {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   line-height: 1.6;

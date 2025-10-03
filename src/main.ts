@@ -125,11 +125,18 @@ class ProfessionalCV {
   }
 
   private async init(): Promise<void> {
-    // Check if Analytics is working
-
-    // Track page view
-    this.trackEvent('page_view', 'cv_loaded');
+    // Initialize cookie consent
+    this.initCookieConsent();
     
+    // Check if Analytics is working
+   // this.checkAnalyticsStatus();
+    
+    // Track page view (only if consent given)
+    if (this.hasAnalyticsConsent()) {
+      this.trackEvent('page_view', 'cv_loaded');
+    }
+    
+    // Lazy load intro sequence for better performance
     await this.showIntroSequence();
    // await this.showFlashlightSearch();
   }
@@ -369,9 +376,15 @@ class ProfessionalCV {
   private setupHideAndSeekGame(): void {
     const foundSections = new Set<string>();
     let gameCompleted = false;
+    let lastCheckTime = 0;
+    const THROTTLE_DELAY = 16; // ~60fps
 
     // Check for flashlight detection of hidden sections
     const checkFlashlightDetection = () => {
+      // Throttle for performance
+      const now = Date.now();
+      if (now - lastCheckTime < THROTTLE_DELAY) return;
+      lastCheckTime = now;
       if (gameCompleted || !this.flashlight) return;
 
       const hiddenSections = document.querySelectorAll('.hidden-section');
@@ -425,8 +438,12 @@ class ProfessionalCV {
     document.addEventListener('touchmove', checkFlashlightDetection, { passive: false });
     document.addEventListener('touchstart', checkFlashlightDetection, { passive: false });
     
-    // Store reference for cleanup
-    (this as any).hideAndSeekHandler = checkFlashlightDetection;
+    // Store references for cleanup
+    (this as any).hideAndSeekHandlers = {
+      mousemove: checkFlashlightDetection,
+      touchmove: checkFlashlightDetection,
+      touchstart: checkFlashlightDetection
+    };
   }
 
   private revealHiddenSection(sectionId: string): void {
@@ -1092,19 +1109,113 @@ class ProfessionalCV {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  private initCookieConsent(): void {
+    const banner = document.getElementById('cookie-consent-banner');
+    const acceptBtn = document.getElementById('accept-cookies');
+    const declineBtn = document.getElementById('decline-cookies');
+    
+    if (!banner || !acceptBtn || !declineBtn) return;
+    
+    // Check if consent already given
+    const consent = localStorage.getItem('analytics-consent');
+    if (consent === 'accepted') {
+      this.grantAnalyticsConsent();
+      return;
+    } else if (consent === 'declined') {
+      this.denyAnalyticsConsent();
+      return;
+    }
+    
+    // Show banner if no consent given
+    banner.style.display = 'block';
+    
+    acceptBtn.addEventListener('click', () => {
+      localStorage.setItem('analytics-consent', 'accepted');
+      banner.style.display = 'none';
+      this.grantAnalyticsConsent();
+      this.trackEvent('user_interaction', 'cookie_consent', 'accepted');
+    });
+    
+    declineBtn.addEventListener('click', () => {
+      localStorage.setItem('analytics-consent', 'declined');
+      banner.style.display = 'none';
+      this.denyAnalyticsConsent();
+      this.trackEvent('user_interaction', 'cookie_consent', 'declined');
+    });
+  }
+
+  private hasAnalyticsConsent(): boolean {
+    return localStorage.getItem('analytics-consent') === 'accepted';
+  }
+
+  private grantAnalyticsConsent(): void {
+    if (typeof window.gtag === 'function') {
+      window.gtag('consent', 'update', {
+        'analytics_storage': 'granted'
+      });
+    }
+  }
+
+  private denyAnalyticsConsent(): void {
+    if (typeof window.gtag === 'function') {
+      window.gtag('consent', 'update', {
+        'analytics_storage': 'denied'
+      });
+
+    }
+  }
+
+
+
+  public cleanupEventListeners(): void {
+    // Clean up hide and seek game listeners
+    const handlers = (this as any).hideAndSeekHandlers;
+    if (handlers) {
+      document.removeEventListener('mousemove', handlers.mousemove);
+      document.removeEventListener('touchmove', handlers.touchmove);
+      document.removeEventListener('touchstart', handlers.touchstart);
+    }
+
+    // Clean up flashlight listeners
+    if (this.flashlight) {
+      this.flashlight.destroy();
+      this.flashlight = null;
+    }
+
+    // Clean up progress bar easter egg
+    const progressHandler = (this as any).progressBarEasterEggHandler;
+    if (progressHandler) {
+      const progressBar = document.querySelector('.game-progress');
+      if (progressBar) {
+        progressBar.removeEventListener('click', progressHandler);
+      }
+    }
+  }
 
   private trackEvent(eventName: string, eventCategory: string, eventLabel?: string, value?: number): void {
+    // Only track if consent is given
+    
     if (typeof window.gtag === 'function') {
       window.gtag('event', eventName, {
         event_category: eventCategory,
         event_label: eventLabel,
         value: value
       });
-    } 
+    } else {
+    }
   }
 }
 
 // Initialize the CV when the DOM is loaded
+let cvInstance: ProfessionalCV | null = null;
+
 document.addEventListener('DOMContentLoaded', () => {
-  new ProfessionalCV();
+  cvInstance = new ProfessionalCV();
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+  if (cvInstance) {
+    cvInstance.cleanupEventListeners();
+  }
 });
