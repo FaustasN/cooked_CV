@@ -1,6 +1,14 @@
 import './style.css'
 import { Flashlight } from './flashlight'
 
+// Google Analytics types
+declare global {
+  interface Window {
+    gtag: (...args: any[]) => void;
+    dataLayer: any[];
+  }
+}
+
 interface CVData {
   name: string;
   title: string;
@@ -117,6 +125,11 @@ class ProfessionalCV {
   }
 
   private async init(): Promise<void> {
+    // Check if Analytics is working
+
+    // Track page view
+    this.trackEvent('page_view', 'cv_loaded');
+    
     await this.showIntroSequence();
    // await this.showFlashlightSearch();
   }
@@ -187,6 +200,9 @@ class ProfessionalCV {
     const app = document.querySelector<HTMLDivElement>('#app');
     if (!app) return;
 
+    // Track user choice
+    this.trackEvent('user_interaction', 'intro_choice', choice);
+
     if (choice === 'yes') {
       // Fade out all intro elements
       const introElements = document.querySelectorAll('.intro-text, .choice-buttons');
@@ -220,6 +236,7 @@ class ProfessionalCV {
       }
 
       // Show flashlight search component
+      this.trackEvent('user_interaction', 'flashlight_game_started');
       await this.showFlashlightSearch();
     } else {
       // For "No" choice - fade out everything and show download button
@@ -462,6 +479,10 @@ class ProfessionalCV {
     const handleInteraction = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
+      
+      // Track section view
+      this.trackEvent('user_interaction', 'cv_section_opened', sectionId);
+      
       // Create section content next to the icon
       this.createSectionContent(section, sectionId);
     };
@@ -1032,6 +1053,9 @@ class ProfessionalCV {
   }
 
   private async completeGame(): Promise<void> {
+    // Track game completion
+    this.trackEvent('user_interaction', 'flashlight_game_completed');
+    
     // Show completion message
     const instructions = document.querySelector('.game-instructions');
     if (instructions) {
@@ -1046,6 +1070,9 @@ class ProfessionalCV {
 
 
   private downloadCV(): void {
+    // Track CV download
+    this.trackEvent('user_interaction', 'cv_downloaded');
+    
     // Download the actual PDF CV file
     const link = document.createElement('a');
     link.href = '/FaustasCV.pdf';
@@ -1063,6 +1090,17 @@ class ProfessionalCV {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+
+  private trackEvent(eventName: string, eventCategory: string, eventLabel?: string, value?: number): void {
+    if (typeof window.gtag === 'function') {
+      window.gtag('event', eventName, {
+        event_category: eventCategory,
+        event_label: eventLabel,
+        value: value
+      });
+    } 
   }
 }
 
