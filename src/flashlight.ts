@@ -55,10 +55,10 @@ export class Flashlight {
           url('/backgoundphoto.png');
         background-size: cover;
         background-position: center;
-        cursor: none;
         pointer-events: auto; /* Allow touch events on container */
         z-index: 1000;
       }
+
 
       .flashlight-triangle {
         position: absolute;

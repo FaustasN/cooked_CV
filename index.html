@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CV ZO Edition</title>
+    <title>CV</title> 
     
     <!-- Google tag (gtag.js) - GDPR Compliant -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-N1XJNCSMPG"></script>
@@ -23,9 +23,23 @@
         debug_mode: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1',
         // Cookie settings
         cookie_flags: 'SameSite=None;Secure',
-        // Data retention
+        // Enhanced custom dimensions mapping
         custom_map: {
-          'custom_parameter_1': 'user_type'
+          'custom_parameter_1': 'device_type',      // mobile/tablet/desktop
+          'custom_parameter_2': 'session_id',       // unique session identifier
+          'custom_parameter_3': 'platform',         // operating system
+          'custom_parameter_4': 'language',         // browser language
+          'custom_parameter_5': 'screen_resolution', // screen resolution
+          'custom_parameter_6': 'journey_steps',    // number of user actions
+          'custom_parameter_7': 'session_duration'  // total session time
+        },
+        // Enhanced measurement settings
+        enhanced_measurement: true,
+        // Custom metrics
+        custom_metrics: {
+          'metric_1': 'interaction_time',
+          'metric_2': 'scroll_depth',
+          'metric_3': 'time_on_page'
         }
       });
       

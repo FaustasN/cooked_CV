@@ -9,6 +9,33 @@ declare global {
   }
 }
 
+interface AnalyticsData {
+  sessionId: string;
+  startTime: number;
+  deviceInfo: {
+    userAgent: string;
+    platform: string;
+    language: string;
+    screenResolution: string;
+    viewportSize: string;
+    isMobile: boolean;
+    isTablet: boolean;
+    isDesktop: boolean;
+  };
+  userJourney: {
+    steps: Array<{
+      action: string;
+      timestamp: number;
+      details?: any;
+    }>;
+    totalTime: number;
+  };
+  performance: {
+    pageLoadTime: number;
+    interactionTimes: Record<string, number>;
+  };
+}
+
 interface CVData {
   name: string;
   title: string;
@@ -32,12 +59,6 @@ interface CVData {
     institution: string;
     year: string;
   }>;
-  projects: Array<{
-    name: string;
-    description: string;
-    tech: string[];
-    link?: string;
-  }>;
 }
 
 
@@ -45,8 +66,12 @@ interface CVData {
 class ProfessionalCV {
   private cvData: CVData;
   private flashlight: Flashlight | null = null;
+  private analyticsData!: AnalyticsData;
 
   constructor() {
+    // Initialize analytics data
+    this.initializeAnalytics();
+    
     this.cvData = {
       name: 'Faustas',
       title: 'Web & Software Developer',
@@ -72,7 +97,7 @@ class ProfessionalCV {
         technical: [
           'C++', 'C#', 'HTML', 'CSS', 'JavaScript', 'TypeScript',
           'Node.js', 'Express.js', 'React', 'Vue.js',
-          'Python', 'Unity (Basic)',
+          'Python',
           'MySQL', 'PostgreSQL', 'MongoDB',
           'Zabbix', 'VMware', 'Docker', 'AWS', 'GNS3',
           'TeamViewer', 'RealVNC', 'BGInfo', 'Solar-Putty',
@@ -95,33 +120,145 @@ class ProfessionalCV {
         },
         {
           degree: 'Bachelor of Software Engineering',
-          institution: 'Vilnius Gedimina Technical University',
+          institution: 'Vilnius Gediminas Technical University',
           year: '2021 - 2025'
         },
         {
           degree: 'Master of Artificial Intelligence Solutions Management',
-          institution: 'Vilnius Gedimina Technical University',
+          institution: 'Vilnius Gediminas Technical University',
           year: '2025 - 2027'
         }
        
       ],
-      projects: [
-        {
-          name: 'E-Commerce Platform',
-          description: 'Full-stack e-commerce solution with real-time inventory management',
-          tech: ['React', 'Node.js', 'PostgreSQL', 'Stripe API'],
-          link: 'github.com/faustas/ecommerce'
-        },
-        {
-          name: 'AI Chat Assistant',
-          description: 'Intelligent chatbot with natural language processing capabilities',
-          tech: ['Python', 'TensorFlow', 'FastAPI', 'WebSocket'],
-          link: 'github.com/faustas/ai-chat'
-        }
-      ]
     };
     
     this.init();
+  }
+
+  private initializeAnalytics(): void {
+    const now = Date.now();
+    const userAgent = navigator.userAgent;
+    const platform = navigator.platform;
+    const language = navigator.language;
+    const screenRes = `${window.screen.width}x${window.screen.height}`;
+    const viewport = `${window.innerWidth}x${window.innerHeight}`;
+    
+    // Detect device type
+    const isMobile = window.innerWidth <= 768;
+    const isTablet = window.innerWidth > 768 && window.innerWidth <= 1024;
+    const isDesktop = window.innerWidth > 1024;
+
+    this.analyticsData = {
+      sessionId: `cv_session_${now}_${Math.random().toString(36).substr(2, 9)}`,
+      startTime: now,
+      deviceInfo: {
+        userAgent,
+        platform,
+        language,
+        screenResolution: screenRes,
+        viewportSize: viewport,
+        isMobile,
+        isTablet,
+        isDesktop
+      },
+      userJourney: {
+        steps: [],
+        totalTime: 0
+      },
+      performance: {
+        pageLoadTime: now,
+        interactionTimes: {}
+      }
+    };
+
+    // Track page load performance
+    window.addEventListener('load', () => {
+      this.analyticsData.performance.pageLoadTime = Date.now() - now;
+      this.trackEvent('page_performance', 'page_load_time', 'cv_loaded', this.analyticsData.performance.pageLoadTime);
+    });
+
+    // Track device info
+    this.trackEvent('device_info', 'device_detected', 'device_type', isMobile ? 1 : isTablet ? 2 : 3);
+    
+    // Add initial journey step
+    this.addJourneyStep('cv_initialized', { deviceInfo: this.analyticsData.deviceInfo });
+    
+    // Track scroll depth and engagement
+    this.setupEngagementTracking();
+  }
+
+  private setupEngagementTracking(): void {
+    // Track scroll depth
+    let maxScrollDepth = 0;
+    const trackScrollDepth = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+      const scrollDepth = Math.round((scrollTop + windowHeight) / documentHeight * 100);
+      
+      if (scrollDepth > maxScrollDepth) {
+        maxScrollDepth = scrollDepth;
+        
+        // Track significant scroll milestones
+        if (scrollDepth >= 25 && scrollDepth % 25 === 0) {
+          this.trackDetailedEvent('scroll_depth_reached', 'engagement', {
+            label: `${scrollDepth}%`,
+            value: scrollDepth,
+            timeSpent: Date.now() - this.analyticsData.startTime,
+            deviceInfo: true
+          });
+        }
+      }
+    };
+
+    // Track time spent on page
+    let timeOnPage = 0;
+    const trackTimeOnPage = () => {
+      timeOnPage += 10; // Update every 10 seconds
+      
+      if (timeOnPage % 30 === 0 && timeOnPage <= 300) { // Track every 30 seconds up to 5 minutes
+        this.trackDetailedEvent('time_on_page', 'engagement', {
+          label: `${timeOnPage}s`,
+          value: timeOnPage,
+          deviceInfo: true
+        });
+      }
+    };
+
+    // Track visibility changes (when user switches tabs)
+    let visibilityStartTime = Date.now();
+    const trackVisibility = () => {
+      if (document.hidden) {
+        const visibleTime = Date.now() - visibilityStartTime;
+        this.trackDetailedEvent('page_hidden', 'engagement', {
+          label: 'tab_switched',
+          value: visibleTime,
+          timeSpent: visibleTime,
+          deviceInfo: true
+        });
+      } else {
+        visibilityStartTime = Date.now();
+        this.trackDetailedEvent('page_visible', 'engagement', {
+          label: 'tab_focused',
+          deviceInfo: true
+        });
+      }
+    };
+
+    // Set up event listeners
+    window.addEventListener('scroll', trackScrollDepth, { passive: true });
+    setInterval(trackTimeOnPage, 10000);
+    document.addEventListener('visibilitychange', trackVisibility);
+    
+    // Track page exit
+    window.addEventListener('beforeunload', () => {
+      this.trackDetailedEvent('page_exit', 'engagement', {
+        label: 'session_ended',
+        value: Date.now() - this.analyticsData.startTime,
+        timeSpent: Date.now() - this.analyticsData.startTime,
+        deviceInfo: true
+      });
+    });
   }
 
   private async init(): Promise<void> {
@@ -159,27 +296,27 @@ class ProfessionalCV {
     `;
 
     // Wait for first text to appear
-    await this.delay(1000);
+    await this.delay(300);
     
     // Show first text
     const firstText = document.querySelector('.first-text');
     if (firstText) {
       firstText.classList.add('visible');
-      await this.delay(2500);
+      await this.delay(800);
     }
 
     // Show second text
     const secondText = document.querySelector('.second-text');
     if (secondText) {
       secondText.classList.add('visible');
-      await this.delay(2000);
+      await this.delay(600);
     }
 
     // Show choice buttons
     const choiceButtons = document.querySelector('.choice-buttons');
     if (choiceButtons) {
       choiceButtons.classList.add('visible');
-      await this.delay(1000);
+      await this.delay(400);
     }
 
     // Setup button event listeners
@@ -207,8 +344,13 @@ class ProfessionalCV {
     const app = document.querySelector<HTMLDivElement>('#app');
     if (!app) return;
 
-    // Track user choice
-    this.trackEvent('user_interaction', 'intro_choice', choice);
+    // Track user choice with detailed analytics
+    this.trackDetailedEvent('intro_choice_selected', 'user_interaction', {
+      label: choice,
+      interaction: 'button_click',
+      timeSpent: Date.now() - this.analyticsData.startTime,
+      deviceInfo: true
+    });
 
     if (choice === 'yes') {
       // Fade out all intro elements
@@ -217,7 +359,7 @@ class ProfessionalCV {
         element.classList.add('fade-out');
       });
 
-      await this.delay(1000);
+      await this.delay(500);
 
       // Show "search the area" text
       app.innerHTML = `
@@ -233,17 +375,22 @@ class ProfessionalCV {
       const searchText = document.querySelector('.search-text');
       if (searchText) {
         searchText.classList.add('visible');
-        await this.delay(2000);
+        await this.delay(1000);
       }
 
       // Fade out the search text
       if (searchText) {
         searchText.classList.add('fade-out');
-        await this.delay(1000);
+        await this.delay(500);
       }
 
       // Show flashlight search component
-      this.trackEvent('user_interaction', 'flashlight_game_started');
+      this.trackDetailedEvent('flashlight_game_started', 'user_interaction', {
+        label: 'game_start',
+        interaction: 'navigation',
+        timeSpent: Date.now() - this.analyticsData.startTime,
+        deviceInfo: true
+      });
       await this.showFlashlightSearch();
     } else {
       // For "No" choice - fade out everything and show download button
@@ -252,7 +399,7 @@ class ProfessionalCV {
         element.classList.add('fade-out');
       });
 
-      await this.delay(1000);
+      await this.delay(500);
 
       // Show download CV screen
       app.innerHTML = `
@@ -277,7 +424,7 @@ class ProfessionalCV {
       const feedback = document.querySelector('.choice-feedback');
       if (feedback) {
         feedback.classList.add('visible');
-        await this.delay(1000);
+        await this.delay(600);
       }
 
       const subtitle = document.querySelector('.download-subtitle');
@@ -313,28 +460,48 @@ class ProfessionalCV {
     }
   }
 
-  private async showFlashlightSearch(): Promise<void> {
-    const app = document.querySelector<HTMLDivElement>('#app');
-    if (!app) return;
-
-    // Create flashlight container
-    const flashlightContainer = document.createElement('div');
-    flashlightContainer.id = 'flashlight-game-container';
+  private createResponsiveGameContent(container: HTMLElement): void {
+    const isMobile = window.innerWidth <= 768;
+    const isSmallMobile = window.innerWidth <= 480;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
     
-    // Create game content
-    flashlightContainer.innerHTML = `
+    // Calculate safe positioning based on screen size
+    let iconPositions: Array<{id: string, icon: string, top: number, left: number}>;
+    
+    if (isSmallMobile) {
+      // Very small screens (≤480px)
+      iconPositions = [
+        { id: 'about-contact-section', icon: '👋', top: 15, left: 20 },
+        { id: 'experience-education-section', icon: '💼', top: Math.max(15, viewportHeight - 100), left: viewportWidth - 100 },
+        { id: 'skills-section', icon: '⚡', top: Math.max(15, viewportHeight * 0.4), left: Math.max(20, viewportWidth - 100) }
+      ];
+    } else if (isMobile) {
+      // Mobile screens (≤768px)
+      iconPositions = [
+        { id: 'about-contact-section', icon: '👋', top: 20, left: 30 },
+        { id: 'experience-education-section', icon: '💼', top: Math.max(20, viewportHeight - 120), left: viewportWidth - 120 },
+        { id: 'skills-section', icon: '⚡', top: Math.max(20, viewportHeight * 0.45), left: Math.max(30, viewportWidth - 120) }
+      ];
+    } else {
+      // Desktop screens (>768px)
+      iconPositions = [
+        { id: 'about-contact-section', icon: '👋', top: viewportHeight * 0.1, left: viewportWidth * 0.05 },
+        { id: 'experience-education-section', icon: '💼', top: viewportHeight * 0.8, left: viewportWidth * 0.8 },
+        { id: 'skills-section', icon: '⚡', top: viewportHeight * 0.5, left: viewportWidth * 0.5 }
+      ];
+    }
+    
+    // Create HTML content with calculated positions
+    const iconsHTML = iconPositions.map(pos => 
+      `<div class="cv-icon hidden-section" id="${pos.id}" style="top: ${pos.top}px; left: ${pos.left}px;">
+        <div class="section-icon">${pos.icon}</div>
+      </div>`
+    ).join('');
+    
+    container.innerHTML = `
       <!-- Hidden CV Icons -->
-      <div class="cv-icon hidden-section" id="about-contact-section" style="top: 10%; left: 5%;">
-        <div class="section-icon">👋</div>
-      </div>
-      
-      <div class="cv-icon hidden-section" id="experience-education-section" style="top: 95%; left: 85%;">
-        <div class="section-icon">💼</div>
-      </div>
-      
-      <div class="cv-icon hidden-section" id="skills-section" style="top: 55%; left: 49%;">
-        <div class="section-icon">⚡</div>
-      </div>
+      ${iconsHTML}
       
       <!-- Game Progress -->
       <div class="game-progress">
@@ -349,6 +516,18 @@ class ProfessionalCV {
         <p id="game-instruction-text">Find all 3 CV sections with your flashlight!</p>
       </div>
     `;
+  }
+
+  private async showFlashlightSearch(): Promise<void> {
+    const app = document.querySelector<HTMLDivElement>('#app');
+    if (!app) return;
+
+    // Create flashlight container
+    const flashlightContainer = document.createElement('div');
+    flashlightContainer.id = 'flashlight-game-container';
+    
+    // Create game content with responsive positioning
+    this.createResponsiveGameContent(flashlightContainer);
 
     app.appendChild(flashlightContainer);
 
@@ -371,6 +550,9 @@ class ProfessionalCV {
     
     // Update instructions for mobile
     this.updateMobileInstructions();
+    
+    // Add resize handler to reposition icons on orientation change
+    this.setupResizeHandler(flashlightContainer);
   }
 
   private setupHideAndSeekGame(): void {
@@ -492,34 +674,72 @@ class ProfessionalCV {
   private addIconClickListener(section: HTMLElement, sectionId: string): void {
     section.style.cursor = 'pointer';
     
-    // Handle both click and touch events for mobile compatibility
+    let isProcessing = false;
+    let lastInteractionTime = 0;
+    const DEBOUNCE_DELAY = 500; // Prevent rapid clicks
+    
+    // Handle interaction with debouncing
     const handleInteraction = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
       
-      // Track section view
-      this.trackEvent('user_interaction', 'cv_section_opened', sectionId);
+      const now = Date.now();
+      
+      // Prevent rapid successive clicks
+      if (isProcessing || (now - lastInteractionTime) < DEBOUNCE_DELAY) {
+        return;
+      }
+      
+      isProcessing = true;
+      lastInteractionTime = now;
+      
+      // Track section view with detailed analytics
+      const sectionOpenTime = Date.now();
+      this.trackDetailedEvent('cv_section_opened', 'user_interaction', {
+        label: sectionId,
+        section: sectionId,
+        interaction: 'icon_click',
+        timeSpent: sectionOpenTime - this.analyticsData.startTime,
+        deviceInfo: true
+      });
       
       // Create section content next to the icon
       this.createSectionContent(section, sectionId);
+      
+      // Reset processing flag after a delay
+      setTimeout(() => {
+        isProcessing = false;
+      }, DEBOUNCE_DELAY);
     };
     
-    section.addEventListener('click', handleInteraction);
-    section.addEventListener('touchstart', handleInteraction, { passive: false });
-    
-    // Add hover effect (only for non-touch devices)
-    section.addEventListener('mouseenter', () => {
-      if (!('ontouchstart' in window)) {
+    // Use different event handling for touch vs mouse devices
+    if ('ontouchstart' in window) {
+      // Mobile: Use touchstart only to prevent double-triggering
+      section.addEventListener('touchstart', handleInteraction, { passive: false });
+      
+      // Add touch feedback
+      section.addEventListener('touchstart', () => {
+        section.style.transform = 'scale(0.95)';
+        section.style.transition = 'transform 0.1s ease';
+      }, { passive: true });
+      
+      section.addEventListener('touchend', () => {
+        section.style.transform = 'scale(1)';
+      }, { passive: true });
+    } else {
+      // Desktop: Use click only
+      section.addEventListener('click', handleInteraction);
+      
+      // Add hover effect for desktop
+      section.addEventListener('mouseenter', () => {
         section.style.transform = 'scale(1.1)';
         section.style.transition = 'transform 0.3s ease';
-      }
-    });
-    
-    section.addEventListener('mouseleave', () => {
-      if (!('ontouchstart' in window)) {
+      });
+      
+      section.addEventListener('mouseleave', () => {
         section.style.transform = 'scale(1)';
-      }
-    });
+      });
+    }
   }
 
   private createSectionContent(iconElement: HTMLElement, sectionId: string): void {
@@ -548,18 +768,23 @@ class ProfessionalCV {
     let contentX, contentY;
     
     if (isMobile) {
-      // Mobile: Center content on screen, above icon
+      // Mobile: Position content in the upper part but allow it to expand
       contentX = (viewportWidth - contentWidth) / 2;
-      contentY = Math.max(20, iconRect.top - contentHeight - 20);
       
-      // If content would go off top, position it below icon
-      if (contentY < 20) {
-        contentY = iconRect.bottom + 20;
+      // Start content in the upper area but allow it to grow down
+      contentY = 20; // Start near the top
+      
+      // Ensure content doesn't go off left or right edges
+      if (contentX < 20) {
+        contentX = 20;
+      }
+      if (contentX + contentWidth > viewportWidth - 20) {
+        contentX = viewportWidth - contentWidth - 20;
       }
       
-      // Ensure content doesn't go off bottom
-      if (contentY + contentHeight > viewportHeight - 20) {
-        contentY = viewportHeight - contentHeight - 20;
+      // If content would go off bottom, move it higher
+      if (contentY + contentHeight > viewportHeight - 100) {
+        contentY = Math.max(20, viewportHeight - contentHeight - 100);
       }
     } else {
       // Desktop: Position next to icon
@@ -621,6 +846,9 @@ class ProfessionalCV {
       transition: all 0.5s ease;
       pointer-events: auto;
       touch-action: manipulation;
+      /* Allow content to expand naturally */
+      min-height: auto;
+      height: auto;
     `;
 
     // Add content based on section with typewriter effect
@@ -660,45 +888,51 @@ class ProfessionalCV {
       -webkit-tap-highlight-color: rgba(255, 255, 255, 0.2);
     `;
     
-    // Handle both click and touch events for close button
+    // Handle close button with debouncing
+    let isClosing = false;
     const handleClose = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
+      
+      if (isClosing) return;
+      isClosing = true;
+      
       contentElement.style.opacity = '0';
       contentElement.style.transform = isMobile ? 'translateY(-20px)' : 'translateX(-20px)';
       setTimeout(() => {
         if (contentElement.parentNode) {
           contentElement.parentNode.removeChild(contentElement);
         }
+        isClosing = false;
       }, 500);
     };
     
-    closeBtn.addEventListener('click', handleClose);
-    closeBtn.addEventListener('touchstart', handleClose, { passive: false });
-    
-    // Add hover effect (only for non-touch devices)
-    closeBtn.addEventListener('mouseenter', () => {
-      if (!('ontouchstart' in window)) {
-        closeBtn.style.background = 'rgba(255, 255, 255, 0.2)';
-        closeBtn.style.transform = 'scale(1.1)';
-      }
-    });
-    
-    closeBtn.addEventListener('mouseleave', () => {
-      if (!('ontouchstart' in window)) {
-        closeBtn.style.background = 'rgba(255, 255, 255, 0.1)';
-        closeBtn.style.transform = 'scale(1)';
-      }
-    });
-    
-    // Add touch feedback for mobile
+    // Use different event handling for touch vs mouse devices
     if ('ontouchstart' in window) {
+      // Mobile: Use touchstart only
+      closeBtn.addEventListener('touchstart', handleClose, { passive: false });
+      
+      // Add touch feedback
       closeBtn.addEventListener('touchstart', () => {
         closeBtn.style.background = 'rgba(255, 255, 255, 0.2)';
         closeBtn.style.transform = 'scale(0.95)';
-      });
+      }, { passive: true });
       
       closeBtn.addEventListener('touchend', () => {
+        closeBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+        closeBtn.style.transform = 'scale(1)';
+      }, { passive: true });
+    } else {
+      // Desktop: Use click only
+      closeBtn.addEventListener('click', handleClose);
+      
+      // Add hover effect for desktop
+      closeBtn.addEventListener('mouseenter', () => {
+        closeBtn.style.background = 'rgba(255, 255, 255, 0.2)';
+        closeBtn.style.transform = 'scale(1.1)';
+      });
+      
+      closeBtn.addEventListener('mouseleave', () => {
         closeBtn.style.background = 'rgba(255, 255, 255, 0.1)';
         closeBtn.style.transform = 'scale(1)';
       });
@@ -717,12 +951,12 @@ class ProfessionalCV {
     container.appendChild(titleElement);
     
     // Type the title
-    this.typeText(titleElement, contentData.title, 50, () => {
+    this.typeText(titleElement, contentData.title, 20, () => {
       // After title is done, create and type the content
       const contentContainer = document.createElement('div');
-      container.appendChild(contentContainer);
+      container.appendChild(contentContainer);  
       
-      this.typeSectionContent(contentContainer, contentData.content, 30);
+      this.typeSectionContent(contentContainer, contentData.content, 10);
     });
   }
 
@@ -1023,22 +1257,22 @@ class ProfessionalCV {
       </div>
     `;
 
-    // Animate menu elements
+    // Animate menu elements almost simultaneously
     setTimeout(() => {
       const menuHeader = document.querySelector('.menu-header');
       if (menuHeader) {
         menuHeader.classList.add('visible');
       }
-    }, 100);
+    }, 5);
 
     setTimeout(() => {
       const menuCards = document.querySelectorAll('.menu-card');
       menuCards.forEach((card, index) => {
         setTimeout(() => {
           card.classList.add('visible');
-        }, index * 200);
+        }, index * 20);
       });
-    }, 300);
+    }, 10);
 
     // Setup menu card event listeners
     this.setupMenuCardListeners();
@@ -1069,9 +1303,46 @@ class ProfessionalCV {
     }
   }
 
+  private setupResizeHandler(container: HTMLElement): void {
+    let resizeTimeout: NodeJS.Timeout;
+    
+    const handleResize = () => {
+      // Debounce resize events
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        // Only reposition if icons exist and are not all revealed
+        const hiddenSections = container.querySelectorAll('.hidden-section');
+        if (hiddenSections.length > 0) {
+          // Recreate game content with new positions
+          this.createResponsiveGameContent(container);
+          
+          // Update flashlight positioning
+          if (this.flashlight) {
+            const isMobile = window.innerWidth <= 768;
+            this.flashlight.setFixedPoint(
+              window.innerWidth / 2,
+              isMobile ? window.innerHeight * 0.8 : window.innerHeight
+            );
+          }
+        }
+      }, 250);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    
+    // Store reference for cleanup
+    (this as any).resizeHandler = handleResize;
+  }
+
   private async completeGame(): Promise<void> {
-    // Track game completion
-    this.trackEvent('user_interaction', 'flashlight_game_completed');
+    // Track game completion with detailed analytics
+    this.trackDetailedEvent('flashlight_game_completed', 'user_interaction', {
+      label: 'game_completed',
+      interaction: 'achievement',
+      timeSpent: Date.now() - this.analyticsData.startTime,
+      deviceInfo: true
+    });
     
     // Show completion message
     const instructions = document.querySelector('.game-instructions');
@@ -1087,8 +1358,13 @@ class ProfessionalCV {
 
 
   private downloadCV(): void {
-    // Track CV download
-    this.trackEvent('user_interaction', 'cv_downloaded');
+    // Track CV download with detailed analytics
+    this.trackDetailedEvent('cv_downloaded', 'user_interaction', {
+      label: 'cv_pdf_download',
+      interaction: 'download',
+      timeSpent: Date.now() - this.analyticsData.startTime,
+      deviceInfo: true
+    });
     
     // Download the actual PDF CV file
     const link = document.createElement('a');
@@ -1190,19 +1466,81 @@ class ProfessionalCV {
         progressBar.removeEventListener('click', progressHandler);
       }
     }
+
+    // Clean up resize handler
+    const resizeHandler = (this as any).resizeHandler;
+    if (resizeHandler) {
+      window.removeEventListener('resize', resizeHandler);
+      window.removeEventListener('orientationchange', resizeHandler);
+    }
   }
 
-  private trackEvent(eventName: string, eventCategory: string, eventLabel?: string, value?: number): void {
+  private addJourneyStep(action: string, details?: any): void {
+    const step = {
+      action,
+      timestamp: Date.now(),
+      details
+    };
+    this.analyticsData.userJourney.steps.push(step);
+    this.analyticsData.userJourney.totalTime = Date.now() - this.analyticsData.startTime;
+  }
+
+
+  private trackEvent(eventName: string, eventCategory: string, eventLabel?: string, value?: number, customParams?: Record<string, any>): void {
     // Only track if consent is given
+    if (!this.hasAnalyticsConsent()) return;
+    
+    // Add journey step for user interactions
+    if (eventCategory === 'user_interaction') {
+      this.addJourneyStep(eventName, { 
+        label: eventLabel, 
+        value, 
+        customParams,
+        sessionTime: Date.now() - this.analyticsData.startTime
+      });
+    }
     
     if (typeof window.gtag === 'function') {
-      window.gtag('event', eventName, {
+      const eventParams: any = {
         event_category: eventCategory,
         event_label: eventLabel,
-        value: value
-      });
-    } else {
+        value: value,
+        // Add custom dimensions
+        custom_parameter_1: this.analyticsData.deviceInfo.isMobile ? 'mobile' : this.analyticsData.deviceInfo.isTablet ? 'tablet' : 'desktop',
+        custom_parameter_2: this.analyticsData.sessionId,
+        custom_parameter_3: this.analyticsData.deviceInfo.platform,
+        custom_parameter_4: this.analyticsData.deviceInfo.language,
+        custom_parameter_5: this.analyticsData.deviceInfo.screenResolution,
+        custom_parameter_6: this.analyticsData.userJourney.steps.length.toString(),
+        custom_parameter_7: this.analyticsData.userJourney.totalTime.toString(),
+        // Add any custom parameters
+        ...customParams
+      };
+
+      window.gtag('event', eventName, eventParams);
     }
+  }
+
+  // Enhanced tracking methods
+  private trackDetailedEvent(eventName: string, eventCategory: string, details: {
+    label?: string;
+    value?: number;
+    section?: string;
+    interaction?: string;
+    timeSpent?: number;
+    deviceInfo?: boolean;
+  }): void {
+    const customParams: Record<string, any> = {};
+    
+    if (details.section) customParams.section = details.section;
+    if (details.interaction) customParams.interaction_type = details.interaction;
+    if (details.timeSpent) customParams.time_spent = details.timeSpent;
+    if (details.deviceInfo) {
+      customParams.viewport_size = this.analyticsData.deviceInfo.viewportSize;
+      customParams.user_agent = this.analyticsData.deviceInfo.userAgent;
+    }
+    
+    this.trackEvent(eventName, eventCategory, details.label, details.value, customParams);
   }
 }
 
