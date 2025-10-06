@@ -1434,6 +1434,74 @@ body .typewriter-cursor {
   transform: translateX(3px);
 }
 
+/* Desktop Section Content - Optimized for zoom handling */
+@media (min-width: 769px) {
+  .icon-section-content {
+    font-size: var(--dynamic-font-size, 0.85rem) !important;
+    line-height: 1.4 !important;
+    padding: 1rem !important;
+    max-width: 350px !important;
+    width: 350px !important;
+    transition: font-size 0.3s ease;
+  }
+  
+  .icon-section-content h3 {
+    font-size: var(--dynamic-h3-size, 1rem) !important;
+    margin-bottom: 0.8rem !important;
+    transition: font-size 0.3s ease;
+  }
+  
+  .icon-section-content p {
+    font-size: var(--dynamic-p-size, 0.8rem) !important;
+    margin-bottom: 0.6rem !important;
+    transition: font-size 0.3s ease;
+  }
+  
+  .icon-section-content h4 {
+    font-size: var(--dynamic-h4-size, 0.9rem) !important;
+    margin-bottom: 0.5rem !important;
+    transition: font-size 0.3s ease;
+  }
+  
+  /* Reduce close button size for better zoom handling */
+  .icon-section-content button {
+    width: 25px !important;
+    height: 25px !important;
+    font-size: 1rem !important;
+    padding: 0.2rem !important;
+  }
+  
+  /* Optimize intro text sizes for zoom handling */
+  .intro-text, .first-text, .second-text, .search-text, .choice-feedback {
+    transition: font-size 0.3s ease;
+  }
+  
+  .intro-text {
+    font-size: 3.5rem !important;
+  }
+  
+  .first-text {
+    font-size: 4rem !important;
+  }
+  
+  .second-text {
+    font-size: 2.2rem !important;
+  }
+  
+  .search-text {
+    font-size: 2.5rem !important;
+  }
+  
+  .choice-feedback {
+    font-size: 2.5rem !important;
+  }
+  
+  /* Add transitions to buttons */
+  .choice-btn, .download-cv-btn, .back-btn {
+    transition: font-size 0.3s ease;
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
   .cv-nav {

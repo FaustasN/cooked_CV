@@ -128,7 +128,6 @@ class ProfessionalCV {
           institution: 'Vilnius Gediminas Technical University',
           year: '2025 - 2027'
         }
-       
       ],
     };
     
@@ -185,6 +184,9 @@ class ProfessionalCV {
     
     // Track scroll depth and engagement
     this.setupEngagementTracking();
+    
+    // Setup dynamic zoom handling
+    this.setupZoomHandling();
   }
 
   private setupEngagementTracking(): void {
@@ -258,6 +260,129 @@ class ProfessionalCV {
         timeSpent: Date.now() - this.analyticsData.startTime,
         deviceInfo: true
       });
+    });
+  }
+
+  private setupZoomHandling(): void {
+    let currentZoomLevel = this.getZoomLevel();
+    let lastZoomLevel = currentZoomLevel;
+    
+    // Apply initial zoom-based styling
+    this.applyZoomStyles(currentZoomLevel);
+    
+    // Track zoom changes
+    const trackZoomChanges = () => {
+      currentZoomLevel = this.getZoomLevel();
+      
+      // Only apply changes if zoom level actually changed
+      if (Math.abs(currentZoomLevel - lastZoomLevel) > 0.05) { // 5% threshold
+        this.applyZoomStyles(currentZoomLevel);
+        lastZoomLevel = currentZoomLevel;
+        
+        // Track zoom change in analytics
+        this.trackDetailedEvent('zoom_level_changed', 'user_interaction', {
+          label: `${Math.round(currentZoomLevel * 100)}%`,
+          value: Math.round(currentZoomLevel * 100),
+          deviceInfo: true
+        });
+      }
+    };
+    
+    // Listen for zoom changes
+    window.addEventListener('resize', trackZoomChanges);
+    window.addEventListener('orientationchange', trackZoomChanges);
+    
+    // Also check periodically for zoom changes (some browsers don't fire resize)
+    setInterval(trackZoomChanges, 500);
+    
+    // Store reference for cleanup
+    (this as any).zoomHandler = trackZoomChanges;
+  }
+
+  private getZoomLevel(): number {
+    // Method 1: Using window.devicePixelRatio (most reliable)
+    const devicePixelRatio = window.devicePixelRatio || 1;
+    
+    // Method 2: Using visual viewport (fallback)
+    const visualViewport = window.visualViewport;
+    if (visualViewport) {
+      const scale = visualViewport.scale;
+      if (scale > 0) {
+        return scale;
+      }
+    }
+    
+    // Method 3: Calculate based on screen dimensions (fallback)
+    const screenWidth = screen.width;
+    const windowWidth = window.innerWidth;
+    const calculatedZoom = windowWidth / screenWidth;
+    
+    // Use the most reliable method available
+    if (devicePixelRatio > 0 && devicePixelRatio !== 1) {
+      return devicePixelRatio;
+    } else if (calculatedZoom > 0 && calculatedZoom !== 1) {
+      return calculatedZoom;
+    }
+    
+    return 1; // Default to 100%
+  }
+
+  private applyZoomStyles(zoomLevel: number): void {
+    // Only apply zoom styles on desktop (screens wider than 768px)
+    if (window.innerWidth <= 768) return;
+    
+    const root = document.documentElement;
+    
+    // Calculate zoom-based font size multipliers
+    // When zoomed in (>100%), make text smaller
+    // When zoomed out (<100%), make text bigger
+    let zoomMultiplier = 1;
+    
+    if (zoomLevel > 1) {
+      // Zoomed in: reduce text size
+      zoomMultiplier = Math.max(0.7, 1 - (zoomLevel - 1) * 0.3);
+    } else if (zoomLevel < 1) {
+      // Zoomed out: increase text size
+      zoomMultiplier = Math.min(1.3, 1 + (1 - zoomLevel) * 0.3);
+    }
+    
+    // Apply zoom-based CSS custom properties
+    root.style.setProperty('--zoom-multiplier', zoomMultiplier.toString());
+    root.style.setProperty('--zoom-level', zoomLevel.toString());
+    
+    // Apply dynamic styles to section content
+    const sectionContents = document.querySelectorAll('.icon-section-content');
+    sectionContents.forEach(content => {
+      const element = content as HTMLElement;
+      
+      // Calculate dynamic font sizes
+      const baseFontSize = 0.85;
+      const baseH3Size = 1.0;
+      const basePSize = 0.8;
+      const baseH4Size = 0.9;
+      
+      element.style.setProperty('--dynamic-font-size', `${baseFontSize * zoomMultiplier}rem`);
+      element.style.setProperty('--dynamic-h3-size', `${baseH3Size * zoomMultiplier}rem`);
+      element.style.setProperty('--dynamic-p-size', `${basePSize * zoomMultiplier}rem`);
+      element.style.setProperty('--dynamic-h4-size', `${baseH4Size * zoomMultiplier}rem`);
+    });
+    
+    // Apply dynamic styles to intro text elements
+    const introTexts = document.querySelectorAll('.intro-text, .first-text, .second-text, .search-text, .choice-feedback');
+    introTexts.forEach(text => {
+      const element = text as HTMLElement;
+      const currentFontSize = parseFloat(getComputedStyle(element).fontSize);
+      const newFontSize = currentFontSize * zoomMultiplier;
+      element.style.fontSize = `${newFontSize}px`;
+    });
+    
+    // Apply dynamic styles to buttons
+    const buttons = document.querySelectorAll('.choice-btn, .download-cv-btn, .back-btn');
+    buttons.forEach(button => {
+      const element = button as HTMLElement;
+      const currentFontSize = parseFloat(getComputedStyle(element).fontSize);
+      const newFontSize = currentFontSize * zoomMultiplier;
+      element.style.fontSize = `${newFontSize}px`;
     });
   }
 
@@ -1472,6 +1597,13 @@ class ProfessionalCV {
     if (resizeHandler) {
       window.removeEventListener('resize', resizeHandler);
       window.removeEventListener('orientationchange', resizeHandler);
+    }
+
+    // Clean up zoom handler
+    const zoomHandler = (this as any).zoomHandler;
+    if (zoomHandler) {
+      window.removeEventListener('resize', zoomHandler);
+      window.removeEventListener('orientationchange', zoomHandler);
     }
   }
 
